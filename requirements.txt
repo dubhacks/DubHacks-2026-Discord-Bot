@@ -1,0 +1,4 @@
+discord.py==2.6.3
+pymongo==4.6.0
+python-dotenv==1.1.1
+audioop-lts==0.2.2; python_version >= "3.13"
