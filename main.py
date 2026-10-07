@@ -1,6 +1,6 @@
 from shared import bot, logger, DISCORD_TOKEN
 from tasks import audit_roles
-import commands  # Import commands module to register the commands
+import commands as _bot_commands  # noqa: F401  (registers the slash commands)
 
 
 @bot.event
@@ -10,13 +10,19 @@ async def on_ready():
     for guild in bot.guilds:
         logger.info(f"  - {guild.name} (id: {guild.id})")
 
+    # Register slash commands per server so they show up immediately instead
+    # of waiting on Discord's global propagation.
+    for guild in bot.guilds:
+        try:
+            bot.tree.copy_global_to(guild=guild)
+            synced = await bot.tree.sync(guild=guild)
+            logger.info(f"Synced {len(synced)} slash commands to {guild.name}")
+        except Exception as e:
+            logger.error(f"Failed to sync slash commands to {guild.name}: {e}")
+
     if not audit_roles.is_running():
         audit_roles.start()
 
-
-@bot.event
-async def on_command_error(ctx, error):
-    logger.error(f"Command error in {ctx.command}: {error}")
 
 logger.info("Starting bot...")
 bot.run(DISCORD_TOKEN)

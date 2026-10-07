@@ -51,3 +51,6 @@ async def audit_roles():
 @audit_roles.before_loop
 async def before_audit_roles():
     await bot.wait_until_ready()
+    # The loop would otherwise fire immediately on startup. Wait one full
+    # interval first so the initial audit happens 10 minutes after boot.
+    await asyncio.sleep(audit_roles.minutes * 60)

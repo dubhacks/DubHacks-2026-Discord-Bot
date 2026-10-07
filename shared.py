@@ -1,6 +1,7 @@
 import os
 import sys
 import discord
+from discord import app_commands
 from discord.ext import commands
 import logging
 from dotenv import load_dotenv
@@ -28,6 +29,19 @@ ROLE_SOURCES = {
     "judges": "Judge",
 }
 
+# Collections written by the hacker-profile-2026 admin portal. Each document has
+# name, start, end (UTC datetimes), location, and dubcoinReward.
+EVENT_SOURCES = {
+    "workshops": "Workshop",
+    "activities": "Activity",
+}
+
+# Only members holding this Discord role may run any bot command.
+STAFF_ROLE = "Staff"
+
+# Timezone used when displaying event times.
+EVENT_TZ = "America/Los_Angeles"
+
 # Set up MongoDB connection
 try:
     mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
@@ -39,11 +53,36 @@ except Exception as e:
     mongo_client = None
     db = None
 
-# Set up Discord bot
+# Set up Discord bot. All commands are slash commands, so the bot never reads
+# message content and nothing typed in chat can trigger it.
 intents = discord.Intents.default()
-intents.messages = True
-intents.message_content = True
 intents.guilds = True
 intents.members = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+
+class StaffOnlyTree(app_commands.CommandTree):
+    """Command tree that refuses every slash command unless the user has the Staff role."""
+
+    async def interaction_check(self, interaction):
+        if interaction.guild is None:
+            return False
+        return any(role.name == STAFF_ROLE for role in interaction.user.roles)
+
+    async def on_error(self, interaction, error):
+        if isinstance(error, app_commands.CheckFailure):
+            message = "Only members with the Staff role can use this bot."
+        else:
+            logger.error(f"Slash command error in {interaction.command}: {error}")
+            message = f"Error: {error}"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+
+
+bot = commands.Bot(
+    command_prefix=commands.when_mentioned,  # unused; no text commands are registered
+    intents=intents,
+    help_command=None,
+    tree_cls=StaffOnlyTree,
+)
