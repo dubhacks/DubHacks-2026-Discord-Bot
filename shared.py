@@ -21,6 +21,14 @@ DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
 MONGO_DB = os.getenv('MONGO_DB', 'dev-cluster')
 
+# Fail fast with a readable message if the token is missing, and show which
+# config names the process can actually see (values are never logged).
+_expected = ("DISCORD_TOKEN", "MONGO_URI", "MONGO_DB", "ANNOUNCE_CHANNEL", "REMINDER_LEAD_MINUTES")
+logger.info("Config present: " + ", ".join(f"{k}={'yes' if os.getenv(k) else 'MISSING'}" for k in _expected))
+if not DISCORD_TOKEN:
+    logger.error("DISCORD_TOKEN is not set. Add it to .env locally or to the service's Variables on the host.")
+    sys.exit(1)
+
 # Which MongoDB collection feeds which Discord role.
 # Collections are the ones hacker-profile-2026 writes to. Each document has a
 # "discord_id" field holding the member's Discord username (not numeric ID).
