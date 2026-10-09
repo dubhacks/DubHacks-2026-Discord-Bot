@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from shared import logger, db, EVENT_SOURCES, EVENT_TZ
+from shared import logger, db, EVENT_SOURCES, EVENT_TZ, ROLE_SOURCES, ANNOUNCE_CHANNEL
+
+HACKER_ROLE = ROLE_SOURCES["hackers"]
 
 
 def load_usernames(collection_name):
@@ -52,6 +54,7 @@ def load_events():
         try:
             for doc in db[collection_name].find({}):
                 events.append({
+                    "id": str(doc.get("_id")),
                     "kind": kind,
                     "name": doc.get("name") or "(unnamed)",
                     "start": _as_utc(doc.get("start")),
@@ -107,3 +110,42 @@ def format_schedule(events):
 
     ordered = sorted(by_day.items(), key=lambda item: (item[0][0] is None, item[0][0] or 0))
     return [(day_title, _table(rows)) for (_, day_title), rows in ordered]
+
+
+# ---------------------------------------------------------------------------
+# Announcements (shared by /announce_event and the automatic reminder task)
+# ---------------------------------------------------------------------------
+
+def fmt_event_window(ev):
+    """'Sat 10:00 AM - 11:00 AM' style summary of when an event runs."""
+    tz = ZoneInfo(EVENT_TZ)
+    if not ev["start"]:
+        return "TBD"
+    start = ev["start"].astimezone(tz)
+    text = start.strftime("%a %I:%M %p")
+    if ev["end"]:
+        text += ev["end"].astimezone(tz).strftime(" - %I:%M %p")
+    return text
+
+
+def announcement_text(ev, role, headline="is happening!"):
+    """The public message hackers see. `role` is the Hacker role (or None)."""
+    tz = ZoneInfo(EVENT_TZ)
+    mention = role.mention if role else f"@{HACKER_ROLE}"
+    lines = [f"📣 {mention} **{ev['name']}** {headline}"]
+    if ev["start"]:
+        start = ev["start"].astimezone(tz).strftime("%I:%M %p")
+        end = ev["end"].astimezone(tz).strftime("%I:%M %p") if ev["end"] else None
+        lines.append(f"🕒 {start}{f' - {end}' if end else ''} PT")
+    lines.append(f"📍 {ev['location']}")
+    return "\n".join(lines)
+
+
+def find_announce_channel(guild):
+    """Resolve ANNOUNCE_CHANNEL (name or numeric ID) to a text channel in this guild."""
+    if ANNOUNCE_CHANNEL.isdigit():
+        channel = guild.get_channel(int(ANNOUNCE_CHANNEL))
+    else:
+        name = ANNOUNCE_CHANNEL.lstrip("#").lower()
+        channel = next((c for c in guild.text_channels if c.name.lower() == name), None)
+    return channel if channel is not None and hasattr(channel, "send") else None

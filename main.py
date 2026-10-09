@@ -1,5 +1,5 @@
 from shared import bot, logger, DISCORD_TOKEN
-from tasks import audit_roles
+from tasks import audit_roles, event_reminders
 import commands as _bot_commands  # noqa: F401  (registers the slash commands)
 
 
@@ -22,6 +22,8 @@ async def on_ready():
 
     if not audit_roles.is_running():
         audit_roles.start()
+    if not event_reminders.is_running():
+        event_reminders.start()
 
 
 logger.info("Starting bot...")

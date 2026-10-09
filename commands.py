@@ -1,12 +1,12 @@
 import asyncio
-from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
 
-from shared import bot, logger, mongo_client, MONGO_DB, ROLE_SOURCES, EVENT_TZ
-from tasks import audit_roles
-from utils import load_usernames, load_events, format_schedule
+from shared import bot, logger, mongo_client, MONGO_DB, ROLE_SOURCES, ANNOUNCE_CHANNEL, REMINDER_LEAD_MINUTES
+from tasks import audit_roles, event_reminders, upcoming_reminders
+from utils import (load_usernames, load_events, format_schedule, fmt_event_window,
+                   announcement_text, find_announce_channel)
 
 # Every command here is a slash command. The Staff role gate lives in
 # StaffOnlyTree (shared.py), so nothing below needs its own permission check.
@@ -24,6 +24,7 @@ COMMAND_HELP = [
     ("/audit_roles", "Run the Hacker/Judge role sync now and report the result"),
     ("/role_stats", "Compare Hacker/Judge counts in the server against the database"),
     ("/invite_check", "Show usage for an invite link and list members with no roles"),
+    ("/reminders", "Show which events the automatic reminder will ping next"),
 ]
 
 
@@ -129,37 +130,13 @@ async def invite_check_command(interaction: discord.Interaction, invite_code: st
 # /announce_event: pick an event from a private dropdown, then ping all hackers.
 # ---------------------------------------------------------------------------
 
-def _fmt_event_window(ev):
-    tz = ZoneInfo(EVENT_TZ)
-    if not ev["start"]:
-        return "TBD"
-    start = ev["start"].astimezone(tz)
-    text = start.strftime("%a %I:%M %p")
-    if ev["end"]:
-        text += ev["end"].astimezone(tz).strftime(" - %I:%M %p")
-    return text
-
-
 def _event_option(index, ev):
     """Dropdown option for one event (label and description max 100 chars)."""
     return discord.SelectOption(
         label=ev["name"][:100],
-        description=f"{_fmt_event_window(ev)} | {ev['location']}"[:100],
+        description=f"{fmt_event_window(ev)} | {ev['location']}"[:100],
         value=str(index),
     )
-
-
-def _announcement_text(ev, role):
-    """The public message hackers see."""
-    tz = ZoneInfo(EVENT_TZ)
-    mention = role.mention if role else f"@{HACKER_ROLE}"
-    lines = [f"\U0001f4e3 {mention} **{ev['name']}** is happening!"]
-    if ev["start"]:
-        start = ev["start"].astimezone(tz).strftime("%I:%M %p")
-        end = ev["end"].astimezone(tz).strftime("%I:%M %p") if ev["end"] else None
-        lines.append(f"\U0001f552 {start}{f' - {end}' if end else ''} PT")
-    lines.append(f"\U0001f4cd {ev['location']}")
-    return "\n".join(lines)
 
 
 class EventPicker(discord.ui.View):
@@ -183,7 +160,7 @@ class EventPicker(discord.ui.View):
         ev = self.events[int(self.select.values[0])]
         role = discord.utils.get(interaction.guild.roles, name=HACKER_ROLE)
         await interaction.channel.send(
-            _announcement_text(ev, role),
+            announcement_text(ev, role),
             allowed_mentions=discord.AllowedMentions(roles=True),
         )
         logger.info(f"{interaction.user} announced event '{ev['name']}'")
@@ -203,3 +180,26 @@ async def announce_event_command(interaction: discord.Interaction):
         view=EventPicker(interaction.user.id, events),
         ephemeral=True,
     )
+
+
+# ---------------------------------------------------------------------------
+# /reminders: show what the automatic 5-minute-before pinger is going to do.
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="reminders", description="Show the next events the automatic reminder will ping")
+async def reminders_command(interaction: discord.Interaction):
+    channel = find_announce_channel(interaction.guild)
+    status = "running" if event_reminders.is_running() else "**not running**"
+    where = channel.mention if channel else f"**no channel named `{ANNOUNCE_CHANNEL}` found**"
+    lines = [
+        f"Automatic reminders are {status}, posting to {where} "
+        f"{REMINDER_LEAD_MINUTES} minutes before each event.",
+        "",
+    ]
+    upcoming = await asyncio.to_thread(upcoming_reminders, 10)
+    if not upcoming:
+        lines.append("No upcoming events left to remind about.")
+    else:
+        lines.append("**Next up:**")
+        lines += [f"• {fmt_event_window(ev)} - {ev['name']} ({ev['location']})" for ev in upcoming]
+    await interaction.response.send_message("\n".join(lines), ephemeral=True)

@@ -42,6 +42,17 @@ STAFF_ROLE = "Staff"
 # Timezone used when displaying event times.
 EVENT_TZ = "America/Los_Angeles"
 
+# Where the automatic event reminders are posted. Either a channel name
+# (e.g. "announcements") or a numeric channel ID.
+ANNOUNCE_CHANNEL = os.getenv("ANNOUNCE_CHANNEL", "announcements")
+
+# How many minutes before an event starts the automatic reminder goes out.
+REMINDER_LEAD_MINUTES = int(os.getenv("REMINDER_LEAD_MINUTES", "5"))
+
+# How often the reminder task re-reads the schedule from Mongo while idle, so
+# events edited in the admin portal are picked up. Lower it (e.g. 1) when testing.
+RESCHEDULE_CHECK_MINUTES = int(os.getenv("RESCHEDULE_CHECK_MINUTES", "10"))
+
 # Set up MongoDB connection
 try:
     mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
