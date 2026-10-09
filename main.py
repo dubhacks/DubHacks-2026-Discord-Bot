@@ -1,4 +1,4 @@
-from shared import bot, logger, DISCORD_TOKEN, AUTO_AUDIT_ROLES
+from shared import bot, logger, DISCORD_TOKEN
 from tasks import audit_roles, event_reminders
 import commands as _bot_commands  # noqa: F401  (registers the slash commands)
 
@@ -20,9 +20,8 @@ async def on_ready():
         except Exception as e:
             logger.error(f"Failed to sync slash commands to {guild.name}: {e}")
 
-    if AUTO_AUDIT_ROLES and not audit_roles.is_running():
+    if not audit_roles.is_running():
         audit_roles.start()
-    logger.info(f"Automatic role audit: {'on' if AUTO_AUDIT_ROLES else 'off'}")
     if not event_reminders.is_running():
         event_reminders.start()
 

@@ -65,10 +65,6 @@ EVENT_SOURCES = {
 # Only members holding this Discord role may run any bot command.
 STAFF_ROLE = "Staff"
 
-# Whether the automatic Hacker/Judge role sync runs on boot. Staff can flip it
-# at runtime with /auto_audit; this only sets the starting state.
-AUTO_AUDIT_ROLES = os.getenv("AUTO_AUDIT_ROLES", "true").strip().lower() not in ("0", "false", "no", "off")
-
 # Timezone used when displaying event times.
 EVENT_TZ = "America/Los_Angeles"
 

@@ -22,7 +22,6 @@ COMMAND_HELP = [
     ("/list_schedule", "List every workshop and activity with time and room"),
     ("/announce_event", "Pick an event from a dropdown and ping all hackers about it"),
     ("/audit_roles", "Run the Hacker/Judge role sync now and report the result"),
-    ("/auto_audit", "Turn the automatic 10-minute role sync on or off, or check it"),
     ("/role_stats", "Compare Hacker/Judge counts in the server against the database"),
     ("/invite_check", "Show usage for an invite link and list members with no roles"),
     ("/reminders", "Show which events the automatic reminder will ping next"),
@@ -80,31 +79,6 @@ async def audit_roles_command(interaction: discord.Interaction):
             f"• **{role_name}:** {counts['added']} newly assigned, "
             f"{counts['missing']} registered but haven't joined the server")
     await interaction.followup.send("\n".join(lines), ephemeral=True)
-
-
-@bot.tree.command(name="auto_audit", description="Turn the automatic role sync on or off, or check its status")
-@app_commands.describe(action="What to do")
-@app_commands.choices(action=[
-    app_commands.Choice(name="status", value="status"),
-    app_commands.Choice(name="on", value="on"),
-    app_commands.Choice(name="off", value="off"),
-])
-async def auto_audit_command(interaction: discord.Interaction, action: app_commands.Choice[str]):
-    running = audit_roles.is_running()
-    if action.value == "on":
-        if not running:
-            audit_roles.start()
-            logger.info(f"Automatic role audit turned on by {interaction.user}")
-        text = "✅ Automatic role audit is on (runs every 10 minutes)."
-    elif action.value == "off":
-        if running:
-            audit_roles.cancel()
-            logger.info(f"Automatic role audit turned off by {interaction.user}")
-        text = "⏸️ Automatic role audit is off. `/audit_roles` still works manually."
-    else:
-        text = ("✅ Automatic role audit is on (runs every 10 minutes)." if running
-                else "⏸️ Automatic role audit is off. `/audit_roles` still works manually.")
-    await interaction.response.send_message(text, ephemeral=True)
 
 
 @bot.tree.command(name="role_stats", description="Compare Hacker/Judge counts in the server against the database")
