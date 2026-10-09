@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord import app_commands
 
-from shared import bot, logger, mongo_client, MONGO_DB, ROLE_SOURCES, ANNOUNCE_CHANNEL, REMINDER_LEAD_MINUTES
+from shared import bot, logger, mongo_client, MONGO_DB, MONGO_CLUSTER, ROLE_SOURCES, ANNOUNCE_CHANNEL, REMINDER_LEAD_MINUTES
 from tasks import audit_roles, event_reminders, upcoming_reminders
 from utils import (load_usernames, load_events, format_schedule, fmt_event_window,
                    announcement_text, find_announce_channel)
@@ -45,7 +45,7 @@ async def ping_command(interaction: discord.Interaction):
         except Exception as e:
             logger.error(f"DB ping failed: {e}")
     if db_ok:
-        text = f"✅ Alive and running, DB connected ({MONGO_DB})"
+        text = f"✅ Alive and running, DB connected ({MONGO_CLUSTER}, db `{MONGO_DB}`)"
     else:
         text = "❌ Alive and running, but DB is unreachable"
     await interaction.response.send_message(text, ephemeral=True)

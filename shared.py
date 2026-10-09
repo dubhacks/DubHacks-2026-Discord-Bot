@@ -21,6 +21,24 @@ DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
 MONGO_DB = os.getenv('MONGO_DB', 'dev-cluster')
 
+
+def _cluster_name(uri):
+    """Human-readable Atlas cluster name from the URI: the appName query param
+    if present, otherwise the first label of the first host."""
+    from urllib.parse import urlsplit, parse_qs
+    try:
+        parts = urlsplit(uri)
+        app = parse_qs(parts.query).get("appName", [None])[0]
+        if app:
+            return app
+        host = parts.netloc.rsplit("@", 1)[-1].split(",")[0].split(":")[0]
+        return host.split(".")[0] or "unknown"
+    except Exception:
+        return "unknown"
+
+
+MONGO_CLUSTER = _cluster_name(MONGO_URI)
+
 # Fail fast with a readable message if the token is missing, and show which
 # config names the process can actually see (values are never logged).
 _expected = ("DISCORD_TOKEN", "MONGO_URI", "MONGO_DB", "ANNOUNCE_CHANNEL", "REMINDER_LEAD_MINUTES")
